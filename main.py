@@ -7,6 +7,29 @@ import tkinter as tk
 from tkinter import filedialog
 
 
+def has_ffmpeg_support() -> bool:
+    """OpenCV が FFMPEG 付きでビルドされているか確認する。"""
+    try:
+        info = cv2.getBuildInformation()
+    except Exception:
+        return False
+
+    return "FFMPEG" in info.upper() and "YES" in info.upper()
+
+
+def create_capture(video_path: str) -> tuple[cv2.VideoCapture, str]:
+    """FFMPEG が使えれば CAP_FFMPEG で開き、だめなら既定バックエンドにフォールバック。"""
+    if has_ffmpeg_support():
+        cap = cv2.VideoCapture(video_path, cv2.CAP_FFMPEG)
+        if cap.isOpened():
+            return cap, "FFMPEG"
+        cap.release()
+        print("FFMPEG バックエンドで開けませんでした。標準バックエンドにフォールバックします。")
+
+    cap = cv2.VideoCapture(video_path)
+    return cap, "DEFAULT"
+
+
 def format_time_msec(msec: float) -> str:
     """
     動画の経過時間（ミリ秒）を mmssmmm 形式の文字列にフォーマットする。
@@ -56,7 +79,7 @@ def resolve_video_path_from_args_or_dialog() -> str | None:
 
 
 def reopen_and_seek_to_frame(video_path: str, target_frame_index: int):
-    cap = cv2.VideoCapture(video_path)
+    cap, backend = create_capture(video_path)
     if not cap.isOpened():
         print("動画ファイルを再オープンできませんでした。")
         return None, None
@@ -91,10 +114,11 @@ def main():
     output_dir = os.path.join(base_dir, "snapshots")
     os.makedirs(output_dir, exist_ok=True)
 
-    cap = cv2.VideoCapture(video_path)
+    cap, backend = create_capture(video_path)
     if not cap.isOpened():
         print("動画ファイルを開けませんでした。コーデックなどを確認してください。")
         sys.exit(1)
+    print(f"使用バックエンド: {backend}")
 
     window_name = "Video (space: play/pause, s: snapshot, a/d: frame step, r/R: resize, q or ×: quit)"
     cv2.namedWindow(window_name, cv2.WINDOW_NORMAL)
