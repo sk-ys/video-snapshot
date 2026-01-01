@@ -30,6 +30,26 @@ def create_capture(video_path: str) -> tuple[cv2.VideoCapture, str]:
     return cap, "DEFAULT"
 
 
+def save_frame(filepath: str, frame) -> bool:
+    """Windows の日本語 UNC パスで imwrite が失敗する場合に備え、imencode で書き込む。"""
+    try:
+        ok, buf = cv2.imencode(".png", frame)
+    except Exception as e:
+        print(f"imencode 失敗: {e}")
+        return False
+
+    if not ok:
+        return False
+
+    try:
+        with open(filepath, "wb") as f:
+            f.write(buf.tobytes())
+        return True
+    except Exception as e:
+        print(f"ファイル書き込みに失敗しました: {e}")
+        return False
+
+
 def format_time_msec(msec: float) -> str:
     """
     動画の経過時間（ミリ秒）を mmssmmm 形式の文字列にフォーマットする。
@@ -184,6 +204,7 @@ def main():
 
         elif key == ord("s"):
             if frame is None:
+                print("スナップショット失敗: frame が空です。")
                 continue
 
             pos_msec = cap.get(cv2.CAP_PROP_POS_MSEC)
@@ -193,8 +214,14 @@ def main():
             filename = f"{base_name}_{time_str}_{frame_index:06d}.png"
             filepath = os.path.join(output_dir, filename)
 
-            cv2.imwrite(filepath, frame)
-            print(f"スナップショット保存: {filepath}")
+            saved = save_frame(filepath, frame)
+            if saved:
+                print(f"スナップショット保存: {filepath}")
+            else:
+                print(
+                    "スナップショット保存に失敗しました。 "
+                    f"shape={getattr(frame, 'shape', None)}, dtype={getattr(frame, 'dtype', None)}"
+                )
 
         elif key == ord("a"):
             # 一時停止中のみ有効: 1 フレーム戻す
