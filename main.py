@@ -14,7 +14,7 @@ def has_ffmpeg_support() -> bool:
     except Exception:
         return False
 
-    return "FFMPEG" in info.upper() and "YES" in info.upper()
+    return "FFMPEG:YES" in info.upper().replace(" ", "")
 
 
 def create_capture(video_path: str) -> tuple[cv2.VideoCapture, str]:
